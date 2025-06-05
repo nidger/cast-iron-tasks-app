@@ -1,0 +1,15 @@
+# Firebase - for local emulator data or debug logs if you ever use them
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor specific files
+.vscode/
+.idea/
+*.swp
+*.swo

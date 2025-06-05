@@ -1,0 +1,432 @@
+/* Import Oswald at the very top (alternative to HTML link, but HTML link is fine) */
+/* @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&display=swap'); */
+
+:root {
+  --font-family-main: 'Oswald', sans-serif;
+  /* Reverted to Blue Theme */
+  --primary-color: #007bff;
+  --primary-hover-color: #0056b3;
+  --primary-focus-shadow: rgba(0,123,255,.25); /* Standard blue focus shadow */
+
+  --danger-color: #e74c3c;
+  --danger-hover-color: #c0392b;
+  --background-color-body: #f0f2f5;
+  --text-color-main: #333;
+  --text-color-headings: #333;
+  --text-color-section-headings: #2c3e50;
+  --border-color-light: #e0e0e0;
+  --border-color-inputs: #ccd1d9;
+  --border-color-modal-inputs: #bdc3c7;
+  --background-color-container: #ffffff;
+  --background-color-input-section: #e9eef7;
+  --background-color-table-header: #f8f9fa;
+  --table-hover-background: #e9ecef; /* Made hover more visible */
+  --modal-overlay-color: rgba(0,0,0,0.6);
+  --modal-background-color: #fefefe;
+  --done-task-color: #777;
+  --done-task-background-hover: #f0f0f0; /* Kept this distinct for done tasks if needed, but primary hover is general */
+
+  /* Status Badge Colors (no change here) */
+  --status-todo-bg: #cfe2ff;
+  --status-todo-text: #004085;
+  --status-inprogress-bg: #c3e6cb;
+  --status-inprogress-text: #155724;
+  --status-paused-bg: #ffeeba;
+  --status-paused-text: #856404;
+  --status-done-bg: #f5c6cb;
+  --status-done-text: #721c24;
+}
+
+body {
+  font-family: var(--font-family-main);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  background-color: var(--background-color-body);
+  color: var(--text-color-main);
+}
+
+/* Header Banner Styling */
+.app-header {
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--text-color-main);
+}
+
+#headerBanner {
+  width: 100%;
+  max-width: 1285px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+
+.container {
+  max-width: 1000px;
+  margin: 20px auto;
+  background: var(--background-color-container);
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+}
+
+h1, h2 {
+  text-align: center;
+  color: var(--text-color-headings);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.task-input-section {
+  background-color: var(--background-color-input-section);
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+  border: 1px solid #d1d9e6;
+}
+
+.task-input-section h2 {
+  margin-top: 0;
+  color: var(--text-color-section-headings);
+  text-align: left;
+  border-bottom: 2px solid var(--primary-color); /* Back to blue */
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.task-list-section {
+  background-color: var(--background-color-container);
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.task-list-section h2 {
+  margin-top: 0;
+  color: var(--text-color-section-headings);
+  text-align: left;
+  border-bottom: 2px solid var(--primary-color); /* Changed to blue */
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.add-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 0;
+  padding: 0;
+  background-color: transparent;
+}
+
+.add-task-form input,
+.add-task-form select {
+  padding: 12px;
+  border: 1px solid var(--border-color-inputs);
+  border-radius: 5px;
+  box-sizing: border-box;
+  font-family: var(--font-family-main);
+  font-size: 1rem;
+}
+
+/* Consistent blue focus for main form inputs */
+.add-task-form input:focus,
+.add-task-form select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem var(--primary-focus-shadow);
+  outline: none;
+}
+
+.add-task-form input::placeholder {
+  color: #777;
+}
+
+.add-task-form button {
+  padding: 12px 15px;
+  background-color: var(--primary-color); /* Back to blue */
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--font-family-main);
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  font-weight: 500;
+  align-self: flex-start;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.add-task-form button:hover {
+  background-color: var(--primary-hover-color); /* Back to darker blue */
+}
+
+.add-task-form button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+th, td {
+  padding: 14px 12px;
+  border: 1px solid var(--border-color-light);
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  background-color: var(--background-color-table-header);
+  font-weight: 500;
+  text-transform: uppercase;
+  color: #495057;
+}
+
+tbody tr {
+  transition: background-color 0.2s ease-in-out;
+}
+/* Updated hover background for all rows */
+tbody tr:hover, tbody tr:focus-visible {
+  background-color: var(--table-hover-background);
+  cursor: pointer;
+  outline: none;
+}
+
+tbody tr.task-done td {
+  color: var(--done-task-color);
+  text-decoration: line-through;
+}
+/* Ensure done task hover also uses the general hover color */
+tbody tr.task-done:hover, tbody tr.task-done:focus-visible {
+  background-color: var(--table-hover-background);
+}
+
+tbody tr.task-done .status-badge {
+  text-decoration: line-through;
+}
+
+tbody tr.task-done .action-btn {
+  opacity: 0.7;
+}
+tbody tr.task-done .action-btn:hover {
+  opacity: 1;
+}
+
+
+.action-btn {
+  padding: 6px 12px;
+  margin-right: 5px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-family-main);
+  font-weight: 400;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.delete-btn {
+  background-color: var(--danger-color);
+  color: white;
+}
+.delete-btn:hover {
+  background-color: var(--danger-hover-color);
+}
+.delete-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Status Badge Styles (no change) */
+.status-badge {
+  padding: 0.25em 0.6em;
+  font-size: 0.9em;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  display: inline-block;
+  line-height: 1.2;
+  text-align: center;
+  min-width: 80px;
+}
+.status-todo { background-color: var(--status-todo-bg); color: var(--status-todo-text); }
+.status-inprogress { background-color: var(--status-inprogress-bg); color: var(--status-inprogress-text); }
+.status-paused { background-color: var(--status-paused-bg); color: var(--status-paused-text); }
+.status-done { background-color: var(--status-done-bg); color: var(--status-done-text); }
+
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background-color: var(--modal-overlay-color);
+  padding: 20px 0;
+  box-sizing: border-box;
+  font-family: var(--font-family-main);
+}
+
+.modal-content {
+  background-color: var(--modal-background-color);
+  margin: 0 auto;
+  padding: 30px;
+  border: none;
+  width: 90%;
+  max-width: 800px;
+  border-radius: 10px;
+  position: relative;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+  box-sizing: border-box;
+}
+
+.modal-content div:not(.image-preview-container) {
+  margin-bottom: 18px;
+}
+
+.modal-content label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #34495e;
+}
+
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content select,
+.modal-content textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color-modal-inputs);
+  border-radius: 5px;
+  box-sizing: border-box;
+  font-family: var(--font-family-main);
+  font-size: 1rem;
+}
+
+/* Consistent blue focus for modal inputs */
+.modal-content input:focus,
+.modal-content select:focus,
+.modal-content textarea:focus {
+  border-color: var(--primary-color); /* Back to blue */
+  box-shadow: 0 0 0 0.2rem var(--primary-focus-shadow); /* Back to blue shadow */
+  outline: none;
+}
+
+
+.modal-content textarea#modalTaskDetails {
+  resize: none;
+  overflow-y: hidden;
+  min-height: 100px;
+}
+
+.modal-content textarea#modalTaskImageUrls {
+  resize: vertical;
+  min-height: 80px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+
+.modal-content button#saveTaskDetailsBtn {
+  padding: 12px 20px;
+  background-color: var(--primary-color); /* Back to blue */
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--font-family-main);
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+.modal-content button#saveTaskDetailsBtn:hover {
+  background-color: var(--primary-hover-color); /* Back to darker blue */
+}
+.modal-content button#saveTaskDetailsBtn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.close-button {
+  color: #7f8c8d;
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.close-button:hover,
+.close-button:focus {
+  color: #2c3e50;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.image-preview-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #ecf0f1;
+  border: 1px solid #dde4e8;
+  border-radius: 5px;
+  min-height: 60px;
+}
+
+.image-preview-container img {
+  max-width: 180px;
+  max-height: 180px;
+  border: 1px solid var(--border-color-modal-inputs);
+  object-fit: cover;
+  border-radius: 5px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Notification placeholder - basic styling (no change) */
+.notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--text-color-main);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    z-index: 2000;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    opacity: 0;
+    transition: opacity 0.3s ease, bottom 0.3s ease;
+    visibility: hidden;
+}
+.notification.show { opacity: 1; bottom: 30px; visibility: visible; }
+.notification.error { background-color: var(--danger-color); }
+.notification.success { background-color: #28a745; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

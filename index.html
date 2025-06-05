@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative To-Do List</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="app-header">
+        <img src="header_banner.jpeg" alt="Task List Banner" id="headerBanner">
+    </header>
+    <div class="container">
+        <div class="task-input-section">
+            <h2>Add New Task</h2>
+            <div class="add-task-form">
+                <label for="taskTitle" class="sr-only">Task Title</label>
+                <input type="text" id="taskTitle" placeholder="Task Title" required>
+
+                <label for="benefitScore" class="sr-only">Benefit Score</label>
+                <input type="number" id="benefitScore" placeholder="Benefit (e.g., 1-10)" min="1" max="10">
+
+                <label for="complexityScore" class="sr-only">Complexity Score</label>
+                <input type="number" id="complexityScore" placeholder="Complexity (e.g., 1-10)" min="1" max="10">
+
+                <label for="taskStatus" class="sr-only">Status</label>
+                <select id="taskStatus" aria-label="Task status">
+                    <!-- Options populated by JS -->
+                </select>
+
+                <label for="taskTag" class="sr-only">Tag</label>
+                <input type="text" id="taskTag" placeholder="Tag (e.g. Frontend)">
+
+                <label for="taskWho" class="sr-only">Who</label>
+                <input type="text" id="taskWho" placeholder="Who (e.g. Nigel)">
+
+                <button type="button" id="addTaskBtn">Add Task</button>
+            </div>
+        </div>
+
+        <div class="task-list-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                 <h2>Tasks</h2>
+                 <button type="button" id="exportCsvBtn" class="action-btn" style="background-color: var(--primary-color); color: white;">Export to CSV</button>
+            </div>
+            <table id="taskTable" aria-live="polite">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Title</th>
+                        <th>Benefit</th>
+                        <th>Complexity</th>
+                        <th>Status</th>
+                        <th>Tag</th>
+                        <th>Who</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Tasks will be populated here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal for Task Details -->
+    <div id="taskModal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
+        <div class="modal-content">
+            <button class="close-button" aria-label="Close modal">×</button>
+            <h2 id="modalTitle">Task Details</h2>
+            <input type="hidden" id="modalTaskId">
+            <div>
+                <label for="modalTaskTitle">Title:</label>
+                <input type="text" id="modalTaskTitle" required>
+            </div>
+            <div>
+                <label for="modalBenefitScore">Benefit Score:</label>
+                <input type="number" id="modalBenefitScore" min="1" max="10">
+            </div>
+            <div>
+                <label for="modalComplexityScore">Complexity Score:</label>
+                <input type="number" id="modalComplexityScore" min="1" max="10">
+            </div>
+            <div>
+                <label for="modalTaskStatus">Status:</label>
+                <select id="modalTaskStatus">
+                    <!-- Options populated by JS -->
+                </select>
+            </div>
+            <div>
+                <label for="modalTaskTag">Tag:</label>
+                <input type="text" id="modalTaskTag">
+            </div>
+            <div>
+                <label for="modalTaskWho">Who:</label>
+                <input type="text" id="modalTaskWho">
+            </div>
+            <div>
+                <label for="modalTaskDetails">Details:</label>
+                <textarea id="modalTaskDetails" rows="5"></textarea>
+            </div>
+            <div>
+                <label for="modalTaskImageUrls">Image URLs (one per line):</label>
+                <textarea id="modalTaskImageUrls" rows="3" placeholder="https://example.com/image1.jpg\nhttps://example.com/image2.png"></textarea>
+            </div>
+            <div id="modalImagePreview" class="image-preview-container" aria-live="polite">
+                <!-- Image previews will be shown here -->
+            </div>
+            <button type="button" id="saveTaskDetailsBtn">Save Changes</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <!-- No Storage SDK needed for CSV export of URLs -->
+
+    <script src="app.js"></script>
+</body>
+</html>
