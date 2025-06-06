@@ -13,21 +13,22 @@ const firebaseConfig = {
   /*
   --------------------------------------------------------------------------------
     IMPORTANT: FIREBASE SECURITY RULES (Set these in Firebase Console > Firestore Database > Rules)
-  --------------------------------------------------------------------------------
-  rules_version = '2';
-  service cloud.firestore {
-    match /databases/{database}/documents {
-      match /tasks/{taskId} {
-        allow read, write: if true; // DANGEROUS for production. Tighten this ASAP.
+    You should have updated your rules to something like:
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /tasks/{taskId} {
+          allow read, write: if request.auth != null;
+        }
       }
     }
-  }
   --------------------------------------------------------------------------------
   */
   
   // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const db = firebase.firestore(); // Firestore instance
+  const auth = firebase.auth();   // Auth instance
   const tasksCollection = db.collection('tasks');
   
   // --- Constants ---
@@ -44,12 +45,12 @@ const firebaseConfig = {
       CONFIRM: 'confirm'
   };
   
-  // DOM Elements - Declare them here, will be re-assigned in DOMContentLoaded
+  // DOM Elements - Declare globally with 'let', will be assigned in initializeAppLogic
   let taskTableBody, addTaskBtn, taskTitleInput, benefitScoreInput, complexityScoreInput,
       taskStatusInput, taskTagInput, taskWhoInput, modal, closeModalBtn, saveTaskDetailsBtn,
       modalTaskId, modalTaskTitle, modalBenefitScore, modalComplexityScore, modalTaskStatus,
       modalTaskTag, modalTaskDetails, modalTaskImageUrls, modalImagePreview, modalTaskWho,
-      exportCsvButton; // Added exportCsvButton
+      exportCsvButton;
   
   let elementToFocusOnModalClose = null;
   let allFetchedTasks = []; // Array to store tasks for CSV export and rendering
@@ -136,7 +137,7 @@ const firebaseConfig = {
               selectElement.appendChild(option);
           });
       } else {
-          console.error("populateStatusDropdown: selectElement is NULL for an unknown ID.");
+          // console.error("populateStatusDropdown: selectElement is NULL. This might be okay if called before DOM ready.");
       }
   };
   
@@ -149,46 +150,29 @@ const firebaseConfig = {
       return stringField;
   }
   
-  // --- Core Functions ---
-  const renderTasks = (tasksToRender) => { // Changed parameter name for clarity
-      if (!taskTableBody) { // Guard clause
-          console.error("renderTasks: taskTableBody is not available.");
-          return;
-      }
+  // --- Core Functions Definitions (must be defined before being called in initializeAppLogic) ---
+  const renderTasks = (tasksToRender) => {
+      if (!taskTableBody) { console.error("renderTasks: taskTableBody is not yet available."); return; }
       taskTableBody.innerHTML = '';
       if (tasksToRender.length === 0) {
-          const row = taskTableBody.insertRow();
-          const cell = row.insertCell();
-          cell.colSpan = 8;
-          cell.textContent = 'No tasks yet. Add one above!';
-          cell.style.textAlign = 'center';
+          const row = taskTableBody.insertRow(); const cell = row.insertCell();
+          cell.colSpan = 8; cell.textContent = 'No tasks yet. Add one above!'; cell.style.textAlign = 'center';
           return;
       }
       tasksToRender.forEach((task, index) => {
           const row = taskTableBody.insertRow();
-          row.setAttribute('data-id', task.id);
-          row.setAttribute('tabindex', '0');
+          row.setAttribute('data-id', task.id); row.setAttribute('tabindex', '0');
           if (task.status === TASK_STATUS.DONE) row.classList.add('task-done');
-          row.insertCell().textContent = index + 1;
-          row.insertCell().textContent = task.title;
+          row.insertCell().textContent = index + 1; row.insertCell().textContent = task.title;
           row.insertCell().textContent = task.benefitScore === 0 ? '' : task.benefitScore;
           row.insertCell().textContent = task.complexityScore === 0 ? '' : task.complexityScore;
-          const statusCell = row.insertCell();
-          const statusSpan = document.createElement('span');
-          statusSpan.textContent = task.status;
-          statusSpan.classList.add('status-badge', getStatusClass(task.status));
+          const statusCell = row.insertCell(); const statusSpan = document.createElement('span');
+          statusSpan.textContent = task.status; statusSpan.classList.add('status-badge', getStatusClass(task.status));
           statusCell.appendChild(statusSpan);
-          row.insertCell().textContent = task.tag || '';
-          row.insertCell().textContent = task.who || '';
-          const actionsCell = row.insertCell();
-          const deleteBtn = document.createElement('button');
-          deleteBtn.textContent = 'Delete';
-          deleteBtn.classList.add('action-btn', 'delete-btn');
-          deleteBtn.type = 'button';
-          deleteBtn.onclick = async (e) => {
-              e.stopPropagation(); deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting...';
-              await deleteTask(task.id);
-          };
+          row.insertCell().textContent = task.tag || ''; row.insertCell().textContent = task.who || '';
+          const actionsCell = row.insertCell(); const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = 'Delete'; deleteBtn.classList.add('action-btn', 'delete-btn'); deleteBtn.type = 'button';
+          deleteBtn.onclick = async (e) => { e.stopPropagation(); deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting...'; await deleteTask(task.id); };
           actionsCell.appendChild(deleteBtn);
           const handleRowInteraction = () => openTaskModal(task);
           row.addEventListener('click', handleRowInteraction);
@@ -197,10 +181,7 @@ const firebaseConfig = {
   };
   
   const addTask = async () => {
-      if (!taskTitleInput || !benefitScoreInput || !complexityScoreInput || !taskStatusInput || !taskTagInput || !taskWhoInput || !addTaskBtn) {
-          console.error("One or more Add Task form elements are missing.");
-          return;
-      }
+      if (!taskTitleInput) { console.error("addTask: Form elements not ready."); return; }
       const title = taskTitleInput.value.trim();
       if (!title) { showNotification('Task Title is required!', NOTIFICATION_TYPES.ERROR); taskTitleInput.focus(); return; }
       addTaskBtn.disabled = true; addTaskBtn.textContent = 'Adding...';
@@ -233,7 +214,7 @@ const firebaseConfig = {
           catch (error) {
               console.error("Error deleting task: ", error);
               showNotification("Error deleting task. See console for details.", NOTIFICATION_TYPES.ERROR);
-              if (taskTableBody) { // Check if taskTableBody exists
+              if (taskTableBody) {
                   const rowWithError = taskTableBody.querySelector(`tr[data-id="${taskId}"]`);
                   if (rowWithError) { const btn = rowWithError.querySelector('.delete-btn'); if (btn) { btn.disabled = false; btn.textContent = 'Delete'; } }
               }
@@ -242,17 +223,14 @@ const firebaseConfig = {
   };
   
   const openTaskModal = (task) => {
-      if (!modalTaskId || !modalTaskTitle || !modalBenefitScore || !modalComplexityScore || !modalTaskStatus || !modalTaskTag || !modalTaskWho || !modalTaskDetails || !modalTaskImageUrls || !modalImagePreview || !modal) {
-          console.error("One or more modal elements are missing.");
-          return;
-      }
+      if (!modal) { console.error("openTaskModal: Modal elements not ready."); return; }
       elementToFocusOnModalClose = document.activeElement;
       modalTaskId.value = task.id; modalTaskTitle.value = task.title;
       modalBenefitScore.value = task.benefitScore === 0 ? '' : task.benefitScore;
       modalComplexityScore.value = task.complexityScore === 0 ? '' : task.complexityScore;
       modalTaskStatus.value = task.status; modalTaskTag.value = task.tag || ''; modalTaskWho.value = task.who || '';
       modalTaskDetails.value = task.details || '';
-      modalTaskImageUrls.value = (task.imageUrls || []).join('\n');
+      modalTaskImageUrls.value = (task.imageUrls && Array.isArray(task.imageUrls)) ? task.imageUrls.join('\n') : '';
       renderModalImagePreview(task.imageUrls || []);
       modal.style.display = 'block';
       autoResizeTextarea(modalTaskDetails); autoResizeTextarea(modalTaskImageUrls);
@@ -260,11 +238,11 @@ const firebaseConfig = {
   };
   
   const renderModalImagePreview = (urls) => {
-      if (!modalImagePreview) { console.error("renderModalImagePreview: modalImagePreview is missing."); return; }
+      if (!modalImagePreview) { console.error("renderModalImagePreview: modalImagePreview not ready."); return; }
       modalImagePreview.innerHTML = '';
-      if (urls && urls.length > 0) {
+      if (urls && Array.isArray(urls) && urls.length > 0) {
           urls.forEach(url => {
-              const trimmedUrl = url.trim();
+              const trimmedUrl = String(url).trim(); // Ensure url is a string
               if (trimmedUrl !== '') {
                   const img = document.createElement('img'); img.src = trimmedUrl; img.alt = 'Task Image Preview';
                   img.onerror = () => {
@@ -280,7 +258,7 @@ const firebaseConfig = {
   };
   
   const closeModal = () => {
-      if (!modal) { console.error("closeModal: modal element is missing."); return; }
+      if (!modal) { console.error("closeModal: Modal element not ready."); return; }
       modal.style.display = 'none';
       if (modalImagePreview) modalImagePreview.innerHTML = '';
       if(modalTaskDetails) modalTaskDetails.style.height = 'auto';
@@ -289,10 +267,7 @@ const firebaseConfig = {
   };
   
   const saveTaskDetails = async () => {
-      if (!modalTaskId || !modalTaskTitle || !modalBenefitScore || !modalComplexityScore || !modalTaskStatus || !modalTaskTag || !modalTaskWho || !modalTaskDetails || !modalTaskImageUrls || !saveTaskDetailsBtn) {
-          console.error("One or more Save Task Details modal elements are missing.");
-          return;
-      }
+      if (!modalTaskId) { console.error("saveTaskDetails: Modal elements not ready."); return; }
       const taskId = modalTaskId.value;
       if (!taskId) { showNotification("Error: Task ID missing.", NOTIFICATION_TYPES.ERROR); return; }
       const title = modalTaskTitle.value.trim();
@@ -320,12 +295,10 @@ const firebaseConfig = {
   
   const exportTasksToCsv = () => {
       if (!allFetchedTasks || allFetchedTasks.length === 0) {
-          showNotification("No tasks to export.", NOTIFICATION_TYPES.INFO);
-          return;
+          showNotification("No tasks to export.", NOTIFICATION_TYPES.INFO); return;
       }
       const headers = ["Rank", "Title", "Benefit Score", "Complexity Score", "Status", "Tag", "Who", "Details", "Image URLs (joined by ';')"];
       let csvContent = headers.join(",") + "\n";
-  
       allFetchedTasks.forEach((task, index) => {
           const imageUrlsString = (task.imageUrls && Array.isArray(task.imageUrls)) ? task.imageUrls.join('; ') : '';
           const row = [
@@ -335,26 +308,43 @@ const firebaseConfig = {
           ];
           csvContent += row.map(field => escapeCsvField(field)).join(",") + "\n";
       });
-  
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
       if (link.download !== undefined) {
           const url = URL.createObjectURL(blob);
-          link.setAttribute("href", url);
-          link.setAttribute("download", "tasks-export.csv");
-          link.style.visibility = 'hidden';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
+          link.setAttribute("href", url); link.setAttribute("download", "tasks-export.csv");
+          link.style.visibility = 'hidden'; document.body.appendChild(link);
+          link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
       } else {
           showNotification("CSV export not supported by your browser.", NOTIFICATION_TYPES.ERROR);
       }
   };
   
-  // --- Event Listeners & Initial Setup ---
-  document.addEventListener('DOMContentLoaded', () => {
-      // Assign DOM elements once DOM is ready
+  
+  // --- Anonymous Authentication and App Initialization ---
+  auth.signInAnonymously()
+    .then(() => {
+      console.log('User signed in anonymously');
+      initializeAppLogic(); // Initialize app after successful anonymous sign-in
+    })
+    .catch((error) => {
+      console.error('Anonymous sign-in failed:', error);
+      if (document.body) {
+          document.body.innerHTML = `
+              <div style="padding: 20px; text-align: center; font-family: sans-serif;">
+                  <h1>Application Error</h1>
+                  <p>Could not authenticate with the service. Please try refreshing the page.</p>
+                  <p>If the problem persists, please contact support.</p>
+                  <p><em>Error details (for debugging): ${error.message}</em></p>
+              </div>
+          `;
+      }
+    });
+  
+  function initializeAppLogic() {
+      console.log("Initializing application logic after anonymous sign-in.");
+  
+      // Assign DOM elements (now that DOM is ready and auth is complete)
       taskTableBody = document.querySelector('#taskTable tbody');
       addTaskBtn = document.getElementById('addTaskBtn');
       taskTitleInput = document.getElementById('taskTitle');
@@ -376,18 +366,26 @@ const firebaseConfig = {
       modalTaskImageUrls = document.getElementById('modalTaskImageUrls');
       modalImagePreview = document.getElementById('modalImagePreview');
       modalTaskWho = document.getElementById('modalTaskWho');
-      exportCsvButton = document.getElementById('exportCsvBtn'); // Get the export button
+      exportCsvButton = document.getElementById('exportCsvBtn');
   
-      // Check if crucial elements exist before adding listeners or populating
-      if (taskStatusInput) populateStatusDropdown(taskStatusInput); else console.error("#taskStatus not found");
-      if (modalTaskStatus) populateStatusDropdown(modalTaskStatus); else console.error("#modalTaskStatus not found");
+      // Populate dropdowns
+      if (taskStatusInput) {
+          populateStatusDropdown(taskStatusInput);
+          taskStatusInput.value = TASK_STATUS.TODO; // Set default after populating
+      } else {
+          console.error("#taskStatus (Add Form) not found in initializeAppLogic");
+      }
+      if (modalTaskStatus) {
+          populateStatusDropdown(modalTaskStatus);
+      } else {
+          console.error("#modalTaskStatus (Modal Form) not found in initializeAppLogic");
+      }
   
-      if (taskStatusInput) taskStatusInput.value = TASK_STATUS.TODO;
-  
+      // Attach event listeners
       if (addTaskBtn) addTaskBtn.addEventListener('click', addTask);
       if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
       if (saveTaskDetailsBtn) saveTaskDetailsBtn.addEventListener('click', saveTaskDetails);
-      if (exportCsvButton) exportCsvButton.addEventListener('click', exportTasksToCsv); // Add listener for export
+      if (exportCsvButton) exportCsvButton.addEventListener('click', exportTasksToCsv);
   
       if (benefitScoreInput) benefitScoreInput.addEventListener('input', handleScoreInput);
       if (complexityScoreInput) complexityScoreInput.addEventListener('input', handleScoreInput);
@@ -407,36 +405,40 @@ const firebaseConfig = {
       window.addEventListener('keydown', (event) => {
           if (modal && event.key === 'Escape' && modal.style.display === 'block') closeModal();
       });
-  });
   
-  // Firestore listener for real-time updates
-  tasksCollection
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(snapshot => {
-          let tasksFromDb = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-          tasksFromDb.sort((a, b) => {
-              const isDoneA = a.status === TASK_STATUS.DONE; const isDoneB = b.status === TASK_STATUS.DONE;
-              if (isDoneA !== isDoneB) return isDoneA ? 1 : -1;
-              if (isDoneA && isDoneB) return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
-              const categoryA = getScoringCategory(a); const categoryB = getScoringCategory(b);
-              if (categoryA !== categoryB) return categoryB - categoryA;
-              if (categoryA === 2) {
-                  const priorityA = a.priorityScore; const priorityB = b.priorityScore;
-                  if (priorityA !== priorityB) return priorityB - priorityA;
+      // Firestore listener for real-time updates
+      tasksCollection
+          .orderBy('createdAt', 'desc')
+          .onSnapshot(snapshot => {
+              let tasksFromDb = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+              tasksFromDb.sort((a, b) => {
+                const isDoneA = a.status === TASK_STATUS.DONE; const isDoneB = b.status === TASK_STATUS.DONE;
+                if (isDoneA !== isDoneB) return isDoneA ? 1 : -1;
+                if (isDoneA && isDoneB) return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
+                const categoryA = getScoringCategory(a); const categoryB = getScoringCategory(b);
+                if (categoryA !== categoryB) return categoryB - categoryA;
+                if (categoryA === 2) {
+                    const priorityA = a.priorityScore; const priorityB = b.priorityScore;
+                    if (priorityA !== priorityB) return priorityB - priorityA;
+                }
+                return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
+              });
+              allFetchedTasks = tasksFromDb;
+              renderTasks(allFetchedTasks);
+              console.log("Tasks successfully fetched (anonymously authenticated), sorted, and stored for export.");
+          }, error => {
+              console.error("Error fetching tasks (anonymously authenticated): ", error);
+              if (error.code === 'permission-denied') {
+                  showNotification("Permission denied fetching tasks. Firestore rules may need adjustment or auth failed.", NOTIFICATION_TYPES.ERROR, 7000);
+              } else {
+                  let userMessage = "Error fetching tasks. See console.";
+                  if (error.code === 'failed-precondition' && error.message.includes("index")) {
+                      userMessage = "Firestore needs an index. Check console for link, then refresh.";
+                      console.log("Firestore index link:", error.message.substring(error.message.indexOf('https://')));
+                  } else if (error.code === 'unavailable') {
+                      userMessage = "Could not connect to Firestore. Check connection/Firebase.";
+                  }
+                  showNotification(userMessage, NOTIFICATION_TYPES.ERROR, 5000);
               }
-              return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
           });
-          allFetchedTasks = tasksFromDb; // Update the global array for export
-          renderTasks(allFetchedTasks); // Pass the sorted array for rendering
-          console.log("Tasks successfully fetched, sorted, and stored for export.");
-      }, error => {
-          console.error("Error fetching tasks: ", error);
-          let userMessage = "Error fetching tasks. See console.";
-          if (error.code === 'failed-precondition' && error.message.includes("index")) {
-              userMessage = "Firestore needs an index. Check console for link, then refresh.";
-              console.log("Firestore index link:", error.message.substring(error.message.indexOf('https://')));
-          } else if (error.code === 'unavailable') {
-              userMessage = "Could not connect to Firestore. Check connection/Firebase.";
-          }
-          showNotification(userMessage, NOTIFICATION_TYPES.ERROR, 5000);
-      });
+  }
