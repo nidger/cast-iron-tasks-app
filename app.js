@@ -1,10 +1,8 @@
 // Your web app's Firebase configuration
-// !! WARNING: Your API key is visible here. RESTRICT IT IN GOOGLE CLOUD CONSOLE. !!
-// !! Ensure your Firebase Security Rules are set up in the Firebase Console.   !!
 const firebaseConfig = {
-    apiKey: "AIzaSyAqWtjDMQkvzSjC3JmcRYfuMP_VfU3-_E8", // Your actual API key - RESTRICT IT!
+    apiKey: "AIzaSyAqWtjDMQkvzSjC3JmcRYfuMP_VfU3-_E8",
     authDomain: "cast-iron-tasks.firebaseapp.com",
-    projectId: "cast-iron-tasks", // Your actual Project ID
+    projectId: "cast-iron-tasks",
     storageBucket: "cast-iron-tasks.firebasestorage.app",
     messagingSenderId: "742460863108",
     appId: "1:742460863108:web:af3fd7ec7f746dd8a948d1"
@@ -17,300 +15,132 @@ const firebaseConfig = {
   const tasksCollection = db.collection('tasks');
   
   // --- Constants ---
-  const TASK_STATUS = {
-      TODO: 'To Do',
-      IN_PROGRESS: 'In Progress',
-      PAUSED: 'Paused',
-      DONE: 'Done'
-  };
-  const NOTIFICATION_TYPES = {
-      INFO: 'info',
-      SUCCESS: 'success',
-      ERROR: 'error',
-      CONFIRM: 'confirm'
-  };
+  const TASK_STATUS = { TODO: 'To Do', IN_PROGRESS: 'In Progress', PAUSED: 'Paused', DONE: 'Done' };
+  const NOTIFICATION_TYPES = { INFO: 'info', SUCCESS: 'success', ERROR: 'error', CONFIRM: 'confirm' };
   
-  // DOM Elements - Declare globally, will be assigned in initializeAppLogic
+  // DOM Elements
   let taskTableBody, addTaskBtn, taskTitleInput, benefitScoreInput, complexityScoreInput,
       taskStatusInput, taskTagInput, taskWhoInput, modal, closeModalBtn, saveTaskDetailsBtn,
       modalTaskId, modalTaskTitle, modalBenefitScore, modalComplexityScore, modalTaskStatus,
       modalTaskTag, modalTaskDetails, modalTaskImageUrls, modalImagePreview, modalTaskWho,
-      exportCsvButton;
+      exportCsvButton, loginContainer, appContainer, loginEmailInput, loginPasswordInput,
+      loginButton, loginErrorMessage, logoutButton;
   
   let elementToFocusOnModalClose = null;
   let allFetchedTasks = [];
-  let appInitialized = false; // Flag to prevent multiple initializations
+  let appInitialized = false;
+  let firestoreListenerUnsubscribe = null;
   
   // --- Helper Functions ---
-  const calculatePriorityScore = (benefit, complexity) => {
-      const ben = Number(benefit) || 0;
-      const com = Number(complexity) || 0;
-      return ben - com;
+  const calculatePriorityScore = (b, c) => (Number(b) || 0) - (Number(c) || 0);
+  const getScoringCategory = (t) => { const b = Number(t.benefitScore)||0, c = Number(t.complexityScore)||0; if (b && c) return 2; if (b || c) return 1; return 0; };
+  function autoResizeTextarea(el) { if (!el) return; el.style.height="auto"; el.style.height=(el.scrollHeight)+"px"; }
+  const showNotification = (msg, type=NOTIFICATION_TYPES.INFO, dur=3000) => {
+      console.log(`NOTIFY (${type}): ${msg}`);
+      const el = document.createElement('div'); el.className = `notification ${type}`; el.textContent = msg;
+      document.body.appendChild(el); setTimeout(() => el.classList.add('show'), 10);
+      if (type === NOTIFICATION_TYPES.CONFIRM) { document.body.removeChild(el); return window.confirm(msg); }
+      setTimeout(() => { el.classList.remove('show'); setTimeout(() => { if (document.body.contains(el)) document.body.removeChild(el); }, 300); }, dur);
   };
-  
-  const getScoringCategory = (task) => {
-      const benefit = Number(task.benefitScore) || 0;
-      const complexity = Number(task.complexityScore) || 0;
-      if (benefit !== 0 && complexity !== 0) return 2;
-      if (benefit !== 0 || complexity !== 0) return 1;
-      return 0;
-  };
-  
-  function autoResizeTextarea(element) {
-      if (!element) return;
-      element.style.height = "auto";
-      element.style.height = (element.scrollHeight) + "px";
-  }
-  
-  const showNotification = (message, type = NOTIFICATION_TYPES.INFO, duration = 3000) => {
-      console.log(`Notification (${type}): ${message}`); // Log all notifications
-      const notificationElement = document.createElement('div');
-      notificationElement.className = `notification ${type}`;
-      notificationElement.textContent = message;
-      document.body.appendChild(notificationElement);
-      setTimeout(() => notificationElement.classList.add('show'), 10);
-  
-      if (type === NOTIFICATION_TYPES.CONFIRM) {
-          document.body.removeChild(notificationElement);
-          return window.confirm(message);
-      }
-      setTimeout(() => {
-          notificationElement.classList.remove('show');
-          setTimeout(() => {
-              if (document.body.contains(notificationElement)) {
-                  document.body.removeChild(notificationElement);
-              }
-          }, 300);
-      }, duration);
-  };
-  
-  const getStatusClass = (status) => {
-      switch (status) {
-          case TASK_STATUS.TODO: return 'status-todo';
-          case TASK_STATUS.IN_PROGRESS: return 'status-inprogress';
-          case TASK_STATUS.PAUSED: return 'status-paused';
-          case TASK_STATUS.DONE: return 'status-done';
-          default: return '';
-      }
-  };
-  
-  const getValidatedScore = (inputValue) => {
-      if (inputValue === '' || inputValue === null || typeof inputValue === 'undefined') return 0;
-      let score = parseInt(inputValue, 10);
-      if (isNaN(score)) return 0;
-      if (score < 1) return 1;
-      if (score > 10) return 10;
-      return score;
-  };
-  
-  const handleScoreInput = (event) => {
-      const inputElement = event.target;
-      let value = inputElement.value;
-      if (value === '') return;
-      let numValue = parseInt(value, 10);
-      if (isNaN(numValue)) { inputElement.value = ''; return; }
-      if (numValue > 10) inputElement.value = '10';
-      else if (numValue < 1) inputElement.value = '1';
-  };
-  
+  const getStatusClass = (s) => ({ [TASK_STATUS.TODO]:'status-todo', [TASK_STATUS.IN_PROGRESS]:'status-inprogress', [TASK_STATUS.PAUSED]:'status-paused', [TASK_STATUS.DONE]:'status-done' }[s] || '');
+  const getValidatedScore = (val) => { if (val===''||val==null) return 0; let s=parseInt(val,10); if(isNaN(s)) return 0; if(s<1) return 1; if(s>10) return 10; return s; };
+  const handleScoreInput = (e) => { const el=e.target; let v=el.value; if(v==='') return; let nV=parseInt(v,10); if(isNaN(nV)){el.value='';return;} if(nV>10)el.value='10'; else if(nV<1)el.value='1';};
   const statusOptions = [TASK_STATUS.TODO, TASK_STATUS.IN_PROGRESS, TASK_STATUS.PAUSED, TASK_STATUS.DONE];
-  const populateStatusDropdown = (selectElement) => {
-      if (selectElement) {
-          selectElement.innerHTML = '';
-          statusOptions.forEach(statusValue => {
-              const option = document.createElement('option');
-              option.value = statusValue; option.textContent = statusValue;
-              selectElement.appendChild(option);
-          });
-      }
+  const populateStatusDropdown = (sel) => { if(!sel)return; sel.innerHTML=''; statusOptions.forEach(sV=>{const o=document.createElement('option');o.value=sV;o.textContent=sV;sel.appendChild(o);});};
+  function escapeCsvField(fld) { if(fld==null)return''; let sF=String(fld); if(sF.search(/("|,|\n)/g)>=0)sF='"'+sF.replace(/"/g,'""')+'"'; return sF; }
+  
+  // --- Core Functions ---
+  const renderTasks = (tasks) => {
+      if(!taskTableBody){console.error("renderTasks: taskTableBody N/A"); return;}
+      taskTableBody.innerHTML=''; if(tasks.length===0){const r=taskTableBody.insertRow(),c=r.insertCell();c.colSpan=8;c.textContent='No tasks yet.';c.style.textAlign='center';return;}
+      tasks.forEach((t,idx)=>{const r=taskTableBody.insertRow();r.setAttribute('data-id',t.id);r.tabIndex=0;if(t.status===TASK_STATUS.DONE)r.classList.add('task-done');
+      r.insertCell().textContent=idx+1;r.insertCell().textContent=t.title;r.insertCell().textContent=t.benefitScore===0?'':t.benefitScore;r.insertCell().textContent=t.complexityScore===0?'':t.complexityScore;
+      const sC=r.insertCell(),sS=document.createElement('span');sS.textContent=t.status;sS.className=`status-badge ${getStatusClass(t.status)}`;sC.appendChild(sS);
+      r.insertCell().textContent=t.tag||'';r.insertCell().textContent=t.who||'';const aC=r.insertCell(),dB=document.createElement('button');dB.textContent='Delete';dB.className='action-btn delete-btn';dB.type='button';
+      dB.onclick=async(e)=>{e.stopPropagation();dB.disabled=true;dB.textContent='Deleting...';await deleteTask(t.id);};aC.appendChild(dB);
+      const hRI=()=>openTaskModal(t);r.onclick=hRI;r.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' ') {e.preventDefault();hRI();}};});
   };
-  
-  function escapeCsvField(field) {
-      if (field === null || typeof field === 'undefined') return '';
-      let stringField = String(field);
-      if (stringField.search(/("|,|\n)/g) >= 0) {
-          stringField = '"' + stringField.replace(/"/g, '""') + '"';
-      }
-      return stringField;
-  }
-  
-  // --- Core Functions Definitions ---
-  const renderTasks = (tasksToRender) => {
-      if (!taskTableBody) { console.error("renderTasks: taskTableBody is not available."); return; }
-      taskTableBody.innerHTML = '';
-      if (tasksToRender.length === 0) {
-          const row = taskTableBody.insertRow(); const cell = row.insertCell();
-          cell.colSpan = 8; cell.textContent = 'No tasks yet. Add one above!'; cell.style.textAlign = 'center';
-          return;
-      }
-      tasksToRender.forEach((task, index) => {
-          const row = taskTableBody.insertRow();
-          row.setAttribute('data-id', task.id); row.setAttribute('tabindex', '0');
-          if (task.status === TASK_STATUS.DONE) row.classList.add('task-done');
-          row.insertCell().textContent = index + 1; row.insertCell().textContent = task.title;
-          row.insertCell().textContent = task.benefitScore === 0 ? '' : task.benefitScore;
-          row.insertCell().textContent = task.complexityScore === 0 ? '' : task.complexityScore;
-          const statusCell = row.insertCell(); const statusSpan = document.createElement('span');
-          statusSpan.textContent = task.status; statusSpan.classList.add('status-badge', getStatusClass(task.status));
-          statusCell.appendChild(statusSpan);
-          row.insertCell().textContent = task.tag || ''; row.insertCell().textContent = task.who || '';
-          const actionsCell = row.insertCell(); const deleteBtn = document.createElement('button');
-          deleteBtn.textContent = 'Delete'; deleteBtn.classList.add('action-btn', 'delete-btn'); deleteBtn.type = 'button';
-          deleteBtn.onclick = async (e) => { e.stopPropagation(); deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting...'; await deleteTask(task.id); };
-          actionsCell.appendChild(deleteBtn);
-          const handleRowInteraction = () => openTaskModal(task);
-          row.addEventListener('click', handleRowInteraction);
-          row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowInteraction(); } });
-      });
-  };
-  
   const addTask = async () => {
-      if (!taskTitleInput) { console.error("addTask: Form elements not ready."); return; }
-      const title = taskTitleInput.value.trim();
-      if (!title) { showNotification('Task Title is required!', NOTIFICATION_TYPES.ERROR); taskTitleInput.focus(); return; }
-      addTaskBtn.disabled = true; addTaskBtn.textContent = 'Adding...';
-      const benefitScoreVal = getValidatedScore(benefitScoreInput.value);
-      const complexityScoreVal = getValidatedScore(complexityScoreInput.value);
-      const priorityScore = calculatePriorityScore(benefitScoreVal, complexityScoreVal);
-      const newTask = {
-          title, benefitScore: benefitScoreVal, complexityScore: complexityScoreVal, priorityScore,
-          status: taskStatusInput.value, tag: taskTagInput.value.trim(), who: taskWhoInput.value.trim(),
-          details: '', imageUrls: [], createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      try {
-          await tasksCollection.add(newTask);
-          showNotification('Task added successfully!', NOTIFICATION_TYPES.SUCCESS);
-          taskTitleInput.value = ''; benefitScoreInput.value = ''; complexityScoreInput.value = '';
-          if (taskStatusInput) taskStatusInput.value = TASK_STATUS.TODO;
-          taskTagInput.value = ''; taskWhoInput.value = '';
-          taskTitleInput.focus();
-      } catch (error) {
-          console.error("Error adding task: ", error);
-          showNotification("Error adding task. See console for details.", NOTIFICATION_TYPES.ERROR);
-      } finally {
-          if (addTaskBtn) { addTaskBtn.disabled = false; addTaskBtn.textContent = 'Add Task'; }
-      }
+      if(!taskTitleInput){console.error("addTask: elements N/A");return;} const title=taskTitleInput.value.trim(); if(!title){showNotification('Title required',NOTIFICATION_TYPES.ERROR);taskTitleInput.focus();return;}
+      addTaskBtn.disabled=true;addTaskBtn.textContent='Adding...';const bS=getValidatedScore(benefitScoreInput.value),cS=getValidatedScore(complexityScoreInput.value);const pS=calculatePriorityScore(bS,cS);
+      const nT={title,benefitScore:bS,complexityScore:cS,priorityScore:pS,status:taskStatusInput.value,tag:taskTagInput.value.trim(),who:taskWhoInput.value.trim(),details:'',imageUrls:[],createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      try{await tasksCollection.add(nT);showNotification('Task added',NOTIFICATION_TYPES.SUCCESS);taskTitleInput.value='';benefitScoreInput.value='';complexityScoreInput.value='';if(taskStatusInput)taskStatusInput.value=TASK_STATUS.TODO;taskTagInput.value='';taskWhoInput.value='';taskTitleInput.focus();}
+      catch(err){console.error("Add task error:",err);showNotification("Error adding task",NOTIFICATION_TYPES.ERROR);}
+      finally{if(addTaskBtn){addTaskBtn.disabled=false;addTaskBtn.textContent='Add Task';}}
   };
-  
-  const deleteTask = async (taskId) => {
-      const confirmed = showNotification('Are you sure you want to delete this task?', NOTIFICATION_TYPES.CONFIRM);
-      if (confirmed) {
-          try { await tasksCollection.doc(taskId).delete(); showNotification('Task deleted successfully!', NOTIFICATION_TYPES.SUCCESS); }
-          catch (error) {
-              console.error("Error deleting task: ", error);
-              showNotification("Error deleting task. See console for details.", NOTIFICATION_TYPES.ERROR);
-              if (taskTableBody) {
-                  const rowWithError = taskTableBody.querySelector(`tr[data-id="${taskId}"]`);
-                  if (rowWithError) { const btn = rowWithError.querySelector('.delete-btn'); if (btn) { btn.disabled = false; btn.textContent = 'Delete'; } }
-              }
-          }
-      }
+  const deleteTask = async (id) => {
+      const conf=showNotification('Delete task?',NOTIFICATION_TYPES.CONFIRM); if(!conf)return;
+      try{await tasksCollection.doc(id).delete();showNotification('Task deleted',NOTIFICATION_TYPES.SUCCESS);}
+      catch(err){console.error("Delete task error:",err);showNotification("Error deleting task",NOTIFICATION_TYPES.ERROR);
+      if(taskTableBody){const rWE=taskTableBody.querySelector(`tr[data-id="${id}"]`);if(rWE){const b=rWE.querySelector('.delete-btn');if(b){b.disabled=false;b.textContent='Delete';}}}}
   };
-  
-  const openTaskModal = (task) => {
-      if (!modal) { console.error("openTaskModal: Modal elements not ready."); return; }
-      elementToFocusOnModalClose = document.activeElement;
-      modalTaskId.value = task.id; modalTaskTitle.value = task.title;
-      modalBenefitScore.value = task.benefitScore === 0 ? '' : task.benefitScore;
-      modalComplexityScore.value = task.complexityScore === 0 ? '' : task.complexityScore;
-      if (modalTaskStatus) modalTaskStatus.value = task.status;
-      modalTaskTag.value = task.tag || ''; modalTaskWho.value = task.who || '';
-      modalTaskDetails.value = task.details || '';
-      modalTaskImageUrls.value = (task.imageUrls && Array.isArray(task.imageUrls)) ? task.imageUrls.join('\n') : '';
-      renderModalImagePreview(task.imageUrls || []);
-      modal.style.display = 'block';
-      autoResizeTextarea(modalTaskDetails); autoResizeTextarea(modalTaskImageUrls);
-      if (modalTaskTitle) modalTaskTitle.focus();
+  const openTaskModal = (t) => {
+      if(!modal){console.error("openTaskModal: elements N/A");return;} elementToFocusOnModalClose=document.activeElement;
+      modalTaskId.value=t.id;modalTaskTitle.value=t.title;modalBenefitScore.value=t.benefitScore===0?'':t.benefitScore;modalComplexityScore.value=t.complexityScore===0?'':t.complexityScore;
+      if(modalTaskStatus)modalTaskStatus.value=t.status;modalTaskTag.value=t.tag||'';modalTaskWho.value=t.who||'';modalTaskDetails.value=t.details||'';
+      modalTaskImageUrls.value=(t.imageUrls&&Array.isArray(t.imageUrls))?t.imageUrls.join('\n'):'';renderModalImagePreview(t.imageUrls||[]);
+      modal.style.display='block';autoResizeTextarea(modalTaskDetails);autoResizeTextarea(modalTaskImageUrls);if(modalTaskTitle)modalTaskTitle.focus();
   };
-  
   const renderModalImagePreview = (urls) => {
-      if (!modalImagePreview) { console.error("renderModalImagePreview: modalImagePreview not ready."); return; }
-      modalImagePreview.innerHTML = '';
-      if (urls && Array.isArray(urls) && urls.length > 0) {
-          urls.forEach(url => {
-              const trimmedUrl = String(url).trim();
-              if (trimmedUrl !== '') {
-                  const img = document.createElement('img'); img.src = trimmedUrl; img.alt = 'Task Image Preview';
-                  img.onerror = () => {
-                      img.style.display = 'none'; const errorText = document.createElement('span');
-                      errorText.textContent = ` (Image failed: ${trimmedUrl.substring(0,30)}...)`;
-                      errorText.style.fontSize = '0.8em'; errorText.style.color = 'red';
-                      if (img.parentNode) img.parentNode.insertBefore(errorText, img.nextSibling);
-                  };
-                  modalImagePreview.appendChild(img);
-              }
-          });
-      }
+      if(!modalImagePreview){console.error("renderModalImagePreview: N/A");return;} modalImagePreview.innerHTML='';
+      if(urls&&Array.isArray(urls)&&urls.length>0){urls.forEach(u=>{const tU=String(u).trim();if(tU==='')return;
+      const i=document.createElement('img');i.src=tU;i.alt='Preview';i.onerror=()=>{i.style.display='none';const eT=document.createElement('span');eT.textContent=`(Fail: ${tU.slice(0,30)}...)`;eT.style.cssText='font-size:0.8em;color:red';if(i.parentNode)i.parentNode.insertBefore(eT,i.nextSibling);};modalImagePreview.appendChild(i);});}
   };
-  
   const closeModal = () => {
-      if (!modal) { console.error("closeModal: Modal element not ready."); return; }
-      modal.style.display = 'none';
-      if (modalImagePreview) modalImagePreview.innerHTML = '';
-      if(modalTaskDetails) modalTaskDetails.style.height = 'auto';
-      if(modalTaskImageUrls) modalTaskImageUrls.style.height = 'auto';
-      if (elementToFocusOnModalClose) { elementToFocusOnModalClose.focus(); elementToFocusOnModalClose = null; }
+      if(!modal){console.error("closeModal: N/A");return;} modal.style.display='none';if(modalImagePreview)modalImagePreview.innerHTML='';
+      if(modalTaskDetails)modalTaskDetails.style.height='auto';if(modalTaskImageUrls)modalTaskImageUrls.style.height='auto';
+      if(elementToFocusOnModalClose){elementToFocusOnModalClose.focus();elementToFocusOnModalClose=null;}
   };
-  
   const saveTaskDetails = async () => {
-      if (!modalTaskId) { console.error("saveTaskDetails: Modal elements not ready."); return; }
-      const taskId = modalTaskId.value;
-      if (!taskId) { showNotification("Error: Task ID missing.", NOTIFICATION_TYPES.ERROR); return; }
-      const title = modalTaskTitle.value.trim();
-      if (!title) { showNotification('Task Title cannot be empty!', NOTIFICATION_TYPES.ERROR); modalTaskTitle.focus(); return; }
-      saveTaskDetailsBtn.disabled = true; saveTaskDetailsBtn.textContent = 'Saving...';
-      const imageUrls = modalTaskImageUrls.value.split('\n').map(url => url.trim()).filter(url => url !== '');
-      const benefitScoreVal = getValidatedScore(modalBenefitScore.value);
-      const complexityScoreVal = getValidatedScore(modalComplexityScore.value);
-      const priorityScore = calculatePriorityScore(benefitScoreVal, complexityScoreVal);
-      const updatedData = {
-          title, benefitScore: benefitScoreVal, complexityScore: complexityScoreVal, priorityScore,
-          status: modalTaskStatus.value, tag: modalTaskTag.value.trim(), who: modalTaskWho.value.trim(),
-          details: modalTaskDetails.value.trim(), imageUrls
-      };
-      try {
-          await tasksCollection.doc(taskId).update(updatedData);
-          showNotification('Task updated successfully!', NOTIFICATION_TYPES.SUCCESS); closeModal();
-      } catch (error) {
-          console.error("Error updating task: ", error);
-          showNotification("Error updating task. See console for details.", NOTIFICATION_TYPES.ERROR);
-      } finally {
-          if (saveTaskDetailsBtn) { saveTaskDetailsBtn.disabled = false; saveTaskDetailsBtn.textContent = 'Save Changes'; }
-      }
+      if(!modalTaskId){console.error("saveTaskDetails: N/A");return;} const id=modalTaskId.value;if(!id){showNotification('ID missing',NOTIFICATION_TYPES.ERROR);return;}
+      const title=modalTaskTitle.value.trim();if(!title){showNotification('Title required',NOTIFICATION_TYPES.ERROR);modalTaskTitle.focus();return;}
+      saveTaskDetailsBtn.disabled=true;saveTaskDetailsBtn.textContent='Saving...';const imgUrls=modalTaskImageUrls.value.split('\n').map(u=>u.trim()).filter(u=>u!=='');
+      const bS=getValidatedScore(modalBenefitScore.value),cS=getValidatedScore(modalComplexityScore.value);const pS=calculatePriorityScore(bS,cS);
+      const uD={title,benefitScore:bS,complexityScore:cS,priorityScore:pS,status:modalTaskStatus.value,tag:modalTaskTag.value.trim(),who:modalTaskWho.value.trim(),details:modalTaskDetails.value.trim(),imageUrls:imgUrls};
+      try{await tasksCollection.doc(id).update(uD);showNotification('Task saved',NOTIFICATION_TYPES.SUCCESS);closeModal();}
+      catch(err){console.error("Save task error:",err);showNotification("Error saving",NOTIFICATION_TYPES.ERROR);}
+      finally{if(saveTaskDetailsBtn){saveTaskDetailsBtn.disabled=false;saveTaskDetailsBtn.textContent='Save Changes';}}
   };
-  
   const exportTasksToCsv = () => {
-      if (!allFetchedTasks || allFetchedTasks.length === 0) {
-          showNotification("No tasks to export.", NOTIFICATION_TYPES.INFO); return;
-      }
-      const headers = ["Rank", "Title", "Benefit Score", "Complexity Score", "Status", "Tag", "Who", "Details", "Image URLs (joined by ';')"];
-      let csvContent = headers.join(",") + "\n";
-      allFetchedTasks.forEach((task, index) => {
-          const imageUrlsString = (task.imageUrls && Array.isArray(task.imageUrls)) ? task.imageUrls.join('; ') : '';
-          const row = [
-              index + 1, task.title, task.benefitScore === 0 ? '' : task.benefitScore,
-              task.complexityScore === 0 ? '' : task.complexityScore, task.status,
-              task.tag || '', task.who || '', task.details || '', imageUrlsString
-          ];
-          csvContent += row.map(field => escapeCsvField(field)).join(",") + "\n";
-      });
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      if (link.download !== undefined) {
-          const url = URL.createObjectURL(blob);
-          link.setAttribute("href", url); link.setAttribute("download", "tasks-export.csv");
-          link.style.visibility = 'hidden'; document.body.appendChild(link);
-          link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-      } else {
-          showNotification("CSV export not supported by your browser.", NOTIFICATION_TYPES.ERROR);
+      if(!allFetchedTasks||allFetchedTasks.length===0){showNotification("No tasks",NOTIFICATION_TYPES.INFO);return;}
+      const hdrs=["Rank","Title","Benefit","Complexity","Status","Tag","Who","Details","Image URLs (;)"];let csv=hdrs.join(",")+"\n";
+      allFetchedTasks.forEach((t,idx)=>{const iUS=(t.imageUrls&&Array.isArray(t.imageUrls))?t.imageUrls.join('; '):'';
+      const r=[idx+1,t.title,t.benefitScore===0?'':t.benefitScore,t.complexityScore===0?'':t.complexityScore,t.status,t.tag||'',t.who||'',t.details||'',iUS];
+      csv+=r.map(f=>escapeCsvField(f)).join(",")+"\n";});
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const lnk=document.createElement("a");
+      if(lnk.download!==undefined){const url=URL.createObjectURL(blob);lnk.setAttribute("href",url);lnk.setAttribute("download","tasks.csv");
+      lnk.style.visibility='hidden';document.body.appendChild(lnk);lnk.click();document.body.removeChild(lnk);URL.revokeObjectURL(url);}
+      else{showNotification("CSV export N/A",NOTIFICATION_TYPES.ERROR);}
+  };
+  
+  // --- Login/Logout Functions ---
+  const handleLogin = async () => {
+      if (!loginEmailInput || !loginPasswordInput || !loginButton || !loginErrorMessage) { console.error("Login form elements missing."); return; }
+      const email = loginEmailInput.value; const password = loginPasswordInput.value;
+      loginErrorMessage.textContent = ''; loginErrorMessage.style.display = 'none';
+      loginButton.disabled = true; loginButton.textContent = 'Logging in...';
+      try {
+          await auth.signInWithEmailAndPassword(email, password);
+          // onAuthStateChanged will handle UI update
+      } catch (error) {
+          console.error("Login failed:", error);
+          loginErrorMessage.textContent = error.message; // Show Firebase error message
+          loginErrorMessage.style.display = 'block';
+      } finally {
+          if (loginButton) { loginButton.disabled = false; loginButton.textContent = 'Login'; }
       }
   };
   
-  // --- Application Initialization Logic ---
-  function initializeAppLogic(user) {
-      console.log("initializeAppLogic called. User UID (if available):", user ? user.uid : "No user object. Auth might have failed or is pending.");
+  const handleLogout = async () => {
+      try { await auth.signOut(); /* onAuthStateChanged will handle UI update */ }
+      catch (error) { console.error("Sign out error:", error); showNotification("Sign out error", NOTIFICATION_TYPES.ERROR); }
+  };
   
-      // Assign DOM elements now that we expect the DOM to be ready
+  // --- Application Initialization & UI Management ---
+  function initializeAppLogic(user) {
+      console.log("initializeAppLogic called. User:", user ? user.uid : "None");
+      appInitialized = true;
+  
       taskTableBody = document.querySelector('#taskTable tbody');
       addTaskBtn = document.getElementById('addTaskBtn');
       taskTitleInput = document.getElementById('taskTitle');
@@ -333,111 +163,89 @@ const firebaseConfig = {
       modalImagePreview = document.getElementById('modalImagePreview');
       modalTaskWho = document.getElementById('modalTaskWho');
       exportCsvButton = document.getElementById('exportCsvBtn');
+      logoutButton = document.getElementById('logoutButton');
   
-      if (!taskTableBody || !addTaskBtn /* ... add more checks for essential elements */) {
-          console.error("Critical DOM elements missing in initializeAppLogic. Aborting further UI setup.");
-          showNotification("Error initializing the application interface. Please refresh.", NOTIFICATION_TYPES.ERROR, 10000);
-          return;
+      if (!taskTableBody || !addTaskBtn /* more checks if needed */) {
+          console.error("Critical app DOM elements N/A in initializeAppLogic."); return;
       }
   
-      // Populate dropdowns
-      if (taskStatusInput) {
-          populateStatusDropdown(taskStatusInput);
-          taskStatusInput.value = TASK_STATUS.TODO;
-      }
-      if (modalTaskStatus) {
-          populateStatusDropdown(modalTaskStatus);
-      }
+      if (taskStatusInput) { populateStatusDropdown(taskStatusInput); taskStatusInput.value = TASK_STATUS.TODO; }
+      if (modalTaskStatus) { populateStatusDropdown(modalTaskStatus); }
   
-      // Attach event listeners
       if (addTaskBtn) addTaskBtn.addEventListener('click', addTask);
       if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
       if (saveTaskDetailsBtn) saveTaskDetailsBtn.addEventListener('click', saveTaskDetails);
       if (exportCsvButton) exportCsvButton.addEventListener('click', exportTasksToCsv);
+      if (logoutButton) logoutButton.addEventListener('click', handleLogout);
       if (benefitScoreInput) benefitScoreInput.addEventListener('input', handleScoreInput);
       if (complexityScoreInput) complexityScoreInput.addEventListener('input', handleScoreInput);
       if (modalBenefitScore) modalBenefitScore.addEventListener('input', handleScoreInput);
       if (modalComplexityScore) modalComplexityScore.addEventListener('input', handleScoreInput);
-      if (modalTaskDetails) modalTaskDetails.addEventListener('input', function() { autoResizeTextarea(this); });
-      if (modalTaskImageUrls) {
-          modalTaskImageUrls.addEventListener('input', function() {
-              autoResizeTextarea(this);
-              const urls = this.value.split('\n').map(url => url.trim()).filter(url => url);
-              renderModalImagePreview(urls);
-          });
-      }
-      window.onclick = (event) => { if (modal && event.target == modal) closeModal(); };
-      window.addEventListener('keydown', (event) => { if (modal && event.key === 'Escape' && modal.style.display === 'block') closeModal(); });
+      if (modalTaskDetails) modalTaskDetails.addEventListener('input', function(){autoResizeTextarea(this);});
+      if (modalTaskImageUrls) { modalTaskImageUrls.addEventListener('input', function(){autoResizeTextarea(this);const u=this.value.split('\n').map(s=>s.trim()).filter(s=>s);renderModalImagePreview(u);});}
+      window.onclick=(e)=>{if(modal&&e.target==modal)closeModal();};
+      window.onkeydown=(e)=>{if(modal&&e.key==='Escape'&&modal.style.display==='block')closeModal();};
   
-      // Firestore listener for real-time updates
-      console.log("Setting up Firestore onSnapshot listener within initializeAppLogic...");
-      tasksCollection.orderBy('createdAt', 'desc')
+      console.log("Setting up Firestore listener in initializeAppLogic");
+      if (firestoreListenerUnsubscribe) firestoreListenerUnsubscribe(); // Detach old one if exists
+      firestoreListenerUnsubscribe = tasksCollection.orderBy('createdAt', 'desc')
           .onSnapshot(snapshot => {
-              console.log("onSnapshot: Data received. User authenticated:", auth.currentUser ? auth.currentUser.uid : "No current user");
+              console.log("Firestore data received (logged in).");
               let tasksFromDb = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-              tasksFromDb.sort((a, b) => {
-                  const isDoneA = a.status === TASK_STATUS.DONE; const isDoneB = b.status === TASK_STATUS.DONE;
-                  if (isDoneA !== isDoneB) return isDoneA ? 1 : -1;
-                  if (isDoneA && isDoneB) return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
-                  const categoryA = getScoringCategory(a); const categoryB = getScoringCategory(b);
-                  if (categoryA !== categoryB) return categoryB - categoryA;
-                  if (categoryA === 2) {
-                      const priorityA = a.priorityScore; const priorityB = b.priorityScore;
-                      if (priorityA !== priorityB) return priorityB - priorityA;
-                  }
-                  return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
-              });
+              tasksFromDb.sort((a,b)=>{const iDA=a.status===TASK_STATUS.DONE,iDB=b.status===TASK_STATUS.DONE;if(iDA!==iDB)return iDA?1:-1;if(iDA&&iDB)return(b.createdAt?.toDate()?.getTime()||0)-(a.createdAt?.toDate()?.getTime()||0);const cA=getScoringCategory(a),cB=getScoringCategory(b);if(cA!==cB)return cB-cA;if(cA===2){const pA=a.priorityScore,pB=b.priorityScore;if(pA!==pB)return pB-pA;}return(b.createdAt?.toDate()?.getTime()||0)-(a.createdAt?.toDate()?.getTime()||0);});
               allFetchedTasks = tasksFromDb;
               renderTasks(allFetchedTasks);
-              console.log("Tasks successfully fetched, sorted, and rendered.");
           }, error => {
-              console.error("onSnapshot Error (inside initializeAppLogic):", error); // This is the critical error point
-              // Error code 403 is common for permission denied
-              if (error.code === 'permission-denied' || (error.code === 7 && error.message && error.message.toLowerCase().includes("permission denied"))) {
-                  showNotification("PERMISSION DENIED fetching tasks. Ensure Firestore rules allow access and Anonymous Auth is enabled & working.", NOTIFICATION_TYPES.ERROR, 10000);
-                  console.error("Detailed Permission Denied Error:", error.message, error.code, error.name);
-                  console.error("Current auth state when error occurred:", auth.currentUser ? `User UID: ${auth.currentUser.uid}, Anonymous: ${auth.currentUser.isAnonymous}` : "No user authenticated");
-              } else {
-                  let userMessage = "Error fetching tasks. See console.";
-                  if (error.code === 'failed-precondition' && error.message.includes("index")) {
-                      userMessage = "Firestore needs an index. Check console for link, then refresh.";
-                  } else if (error.code === 'unavailable') {
-                      userMessage = "Could not connect to Firestore. Check connection/Firebase.";
-                  }
-                  showNotification(userMessage, NOTIFICATION_TYPES.ERROR, 5000);
-              }
+              console.error("Firestore onSnapshot error (logged in):", error);
+              if(error.code === 'permission-denied'){showNotification("Data permission denied.",NOTIFICATION_TYPES.ERROR,7000); /* auth.signOut(); Optional */}
+              else{showNotification("Error fetching tasks.",NOTIFICATION_TYPES.ERROR);}
           });
   }
   
-  // --- Firebase Auth State Listener and Anonymous Sign-In ---
-  // This is the entry point for the application logic after the script loads.
-  auth.onAuthStateChanged(user => {
-      console.log("Auth state changed. User:", user ? `UID: ${user.uid}, Anonymous: ${user.isAnonymous}` : "null (signed out)");
+  function handleAuthStateChange(user) {
+      // Ensure DOM elements for login/app containers are fetched (idempotent)
+      loginContainer = loginContainer || document.getElementById('loginContainer');
+      appContainer = appContainer || document.getElementById('appContainer');
+      loginEmailInput = loginEmailInput || document.getElementById('loginEmail');
+      loginPasswordInput = loginPasswordInput || document.getElementById('loginPassword');
+      loginButton = loginButton || document.getElementById('loginButton');
+      loginErrorMessage = loginErrorMessage || document.getElementById('loginErrorMessage');
+  
+      if (!loginContainer || !appContainer) { console.error("Login/App container N/A."); return; }
+  
       if (user) {
-          // User is signed in (could be anonymous).
-          if (!appInitialized) { // Initialize the app's UI and listeners only once
-              console.log("User is authenticated, proceeding to initializeAppLogic.");
+          console.log("Auth state: User logged in (UID:", user.uid, "). Showing app.");
+          loginContainer.style.display = 'none';
+          appContainer.style.display = 'block'; // Show the main app container
+          if (!appInitialized) {
               initializeAppLogic(user);
-              appInitialized = true;
-          } else {
-              console.log("User is authenticated, but app already initialized. (e.g. token refresh)");
           }
       } else {
-          // User is signed out. Attempt to sign in anonymously.
-          console.log("No authenticated user found. Attempting anonymous sign-in...");
-          auth.signInAnonymously()
-              .catch(error => {
-                  console.error('CRITICAL: Anonymous sign-in failed within onAuthStateChanged:', error);
-                  if (document.body) { // Make sure body is available
-                      document.body.innerHTML = `
-                          <div style="padding: 20px; text-align: center; font-family: sans-serif;">
-                              <h1>Application Critical Error</h1>
-                              <p>Could not authenticate with the service. This app requires authentication to function.</p>
-                              <p>Please ensure Anonymous Sign-In is enabled in your Firebase project settings and try refreshing.</p>
-                              <p><em>Error details: ${error.message}</em></p>
-                          </div>
-                      `;
-                  }
-              });
+          console.log("Auth state: User logged out. Showing login form.");
+          loginContainer.style.display = 'block';
+          appContainer.style.display = 'none'; // Hide the main app container
+          appInitialized = false;
+          if (firestoreListenerUnsubscribe) { console.log("Detaching Firestore listener."); firestoreListenerUnsubscribe(); firestoreListenerUnsubscribe = null; }
+          if (taskTableBody) taskTableBody.innerHTML = '';
+          allFetchedTasks = [];
+          if (loginButton && !loginButton.hasAttribute('data-listener-set')) {
+              loginButton.addEventListener('click', handleLogin);
+              loginButton.setAttribute('data-listener-set', 'true'); // Prevent multiple listeners
+          }
+          if (loginErrorMessage) { loginErrorMessage.textContent = ''; loginErrorMessage.style.display = 'none'; }
+          if (loginEmailInput) loginEmailInput.value = '';
+          if (loginPasswordInput) loginPasswordInput.value = '';
       }
+  }
+  
+  // --- Entry Point: Listen for DOM ready, then set up Auth Listener ---
+  document.addEventListener('DOMContentLoaded', () => {
+      console.log("DOM fully loaded. Setting up auth state listener.");
+      // Initial UI setup based on current auth state (e.g. if user is already logged in from a previous session)
+      handleAuthStateChange(auth.currentUser);
+  
+      // Listen for subsequent auth state changes
+      auth.onAuthStateChanged(user => {
+          handleAuthStateChange(user);
+      });
   });
