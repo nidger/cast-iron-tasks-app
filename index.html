@@ -20,30 +20,30 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             text-align: center;
-            font-family: var(--font-family-main, 'Oswald', sans-serif); /* Ensure font consistency */
+            font-family: var(--font-family-main, 'Oswald', sans-serif);
         }
         #loginContainer h2 {
-            color: var(--text-color-section-headings, #2c3e50); /* Consistent heading color */
+            color: var(--text-color-section-headings, #2c3e50);
             margin-bottom: 20px;
         }
         #loginContainer input[type="email"],
         #loginContainer input[type="password"] {
             display: block;
-            width: calc(100% - 24px); /* Account for padding */
-            padding: 12px; /* Consistent padding */
+            width: calc(100% - 24px);
+            padding: 12px;
             margin-bottom: 15px;
-            border: 1px solid var(--border-color-inputs, #ccc); /* Consistent border */
-            border-radius: 5px; /* Consistent radius */
+            border: 1px solid var(--border-color-inputs, #ccc);
+            border-radius: 5px;
             box-sizing: border-box;
             font-family: var(--font-family-main, 'Oswald', sans-serif);
             font-size: 1rem;
         }
-        #loginContainer button#loginButton { /* Specific ID for login button styling */
-            padding: 12px 20px; /* Consistent button padding */
+        #loginContainer button#loginButton {
+            padding: 12px 20px;
             background-color: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 5px; /* Consistent radius */
+            border-radius: 5px;
             cursor: pointer;
             font-family: var(--font-family-main, 'Oswald', sans-serif);
             font-size: 1.1rem;
@@ -59,18 +59,15 @@
             cursor: not-allowed;
         }
         #loginErrorMessage {
-            color: var(--danger-color, red); /* Consistent error color */
+            color: var(--danger-color, red);
             margin-top: 15px;
             font-size: 0.9rem;
         }
         #logoutButtonContainer {
             text-align: right;
-            padding: 10px 25px 0px; /* Adjusted padding to align with container padding */
+            padding: 10px 25px 0px;
         }
-        /* Make sure action-btn class is defined in style.css or provide specific styles */
         button#logoutButton.action-btn {
-             /* Styles from action-btn or new specific styles */
-             /* Example if action-btn might not cover it fully: */
             padding: 8px 15px;
             font-size: 0.95rem;
         }
@@ -85,7 +82,7 @@
         <p id="loginErrorMessage" style="display:none;"></p>
     </div>
 
-    <div id="appContainer"> <!-- Wrapper for your main app content -->
+    <div id="appContainer">
         <header class="app-header">
             <img src="header_banner.jpeg" alt="Task List Banner" id="headerBanner">
         </header>
@@ -94,7 +91,7 @@
              <button type="button" id="logoutButton" class="action-btn" style="background-color: var(--danger-color); color:white;">Logout</button>
         </div>
 
-        <div class="container"> <!-- This is the main white box container -->
+        <div class="container">
             <div class="task-input-section">
                 <h2>Add New Task</h2>
                 <div class="add-task-form">
@@ -119,19 +116,21 @@
                      <h2>Tasks</h2>
                      <button type="button" id="exportCsvBtn" class="action-btn" style="background-color: var(--primary-color); color: white;">Export to CSV</button>
                 </div>
-                <table id="taskTable" aria-live="polite">
-                    <thead>
-                        <tr>
-                            <th>Rank</th> <th>Title</th> <th>Benefit</th> <th>Complexity</th>
-                            <th>Status</th> <th>Tag</th> <th>Who</th> <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+                <!-- WRAPPER for horizontal scroll -->
+                <div class="table-scroll-wrapper">
+                    <table id="taskTable" aria-live="polite">
+                        <thead>
+                            <tr>
+                                <th>Rank</th> <th>Title</th> <th>Benefit</th> <th>Complexity</th>
+                                <th>Status</th> <th>Tag</th> <th>Who</th> <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div> <!-- END OF WRAPPER -->
             </div>
-        </div> <!-- End of .container -->
+        </div>
 
-        <!-- Modal for Task Details -->
         <div id="taskModal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
             <div class="modal-content">
                 <span class="close-button" aria-label="Close modal">×</span>
@@ -144,16 +143,20 @@
                 <div><label for="modalTaskTag">Tag:</label><input type="text" id="modalTaskTag"></div>
                 <div><label for="modalTaskWho">Who:</label><input type="text" id="modalTaskWho"></div>
                 <div><label for="modalTaskDetails">Details:</label><textarea id="modalTaskDetails" rows="5"></textarea></div>
-                <div><label for="modalTaskImageUrls">Image URLs (one per line):</label><textarea id="modalTaskImageUrls" rows="3" placeholder="https://example.com/image1.jpg\nhttps://example.com/image2.png"></textarea></div>
+                <div>
+                    <label for="modalTaskImageUrls">Image URLs (one per line):</label>
+                    <!-- UPDATED placeholder for image URLs -->
+                    <textarea id="modalTaskImageUrls" rows="3" placeholder="https://example.com/your-image.jpg"></textarea>
+                </div>
                 <div id="modalImagePreview" class="image-preview-container" aria-live="polite"></div>
                 <button type="button" id="saveTaskDetailsBtn">Save Changes</button>
             </div>
         </div>
-    </div> <!-- End of appContainer -->
+    </div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script> <!-- Ensure Auth SDK is here -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <script src="app.js"></script>
 </body>

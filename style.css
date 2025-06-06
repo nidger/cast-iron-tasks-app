@@ -3,13 +3,11 @@
 
 :root {
   --font-family-main: 'Oswald', sans-serif;
-  /* Reverted to Blue Theme */
   --primary-color: #007bff;
   --primary-hover-color: #0056b3;
-  --primary-focus-shadow: rgba(0,123,255,.25); /* Standard blue focus shadow */
-
-  --danger-color: #e74c3c;
-  --danger-hover-color: #c0392b;
+  --primary-focus-shadow: rgba(0,123,255,.25);
+  --danger-color: #dc3545; /* Standard Bootstrap danger red, or your e74c3c */
+  --danger-hover-color: #c82333; /* Darker red */
   --background-color-body: #f0f2f5;
   --text-color-main: #333;
   --text-color-headings: #333;
@@ -20,13 +18,10 @@
   --background-color-container: #ffffff;
   --background-color-input-section: #e9eef7;
   --background-color-table-header: #f8f9fa;
-  --table-hover-background: #e9ecef; /* Made hover more visible */
+  --table-hover-background: #e9ecef;
   --modal-overlay-color: rgba(0,0,0,0.6);
   --modal-background-color: #fefefe;
   --done-task-color: #777;
-  --done-task-background-hover: #f0f0f0; /* Kept this distinct for done tasks if needed, but primary hover is general */
-
-  /* Status Badge Colors (no change here) */
   --status-todo-bg: #cfe2ff;
   --status-todo-text: #004085;
   --status-inprogress-bg: #c3e6cb;
@@ -46,22 +41,26 @@ body {
   color: var(--text-color-main);
 }
 
-/* Header Banner Styling */
+/* Header Banner Styling - UPDATED */
 .app-header {
   width: 100%;
+  height: 250px; /* Example: Adjust this value as desired */
+  /* Or use viewport height: e.g., height: 30vh; */
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: var(--text-color-main);
+  background-color: #222; /* Dark fallback for banner */
+  position: relative;
 }
 
 #headerBanner {
   width: 100%;
-  max-width: 1285px;
-  height: auto;
+  height: 100%;
+  object-fit: cover; /* Scales image to maintain aspect ratio while filling, crops if necessary */
+  object-position: center; /* Centers the image if cropping occurs */
   display: block;
-  margin: 0 auto;
+  /* max-width: none; /* Ensure no max-width constraint if you want full cover */
 }
 
 
@@ -94,13 +93,13 @@ h1, h2 {
   margin-top: 0;
   color: var(--text-color-section-headings);
   text-align: left;
-  border-bottom: 2px solid var(--primary-color); /* Back to blue */
+  border-bottom: 2px solid var(--primary-color);
   padding-bottom: 10px;
   margin-bottom: 20px;
 }
 
 .task-list-section {
-  background-color: var(--background-color-container);
+  background-color: var(--background-color-container); /* Keep white or light neutral */
   padding: 20px;
   border-radius: 8px;
 }
@@ -109,7 +108,7 @@ h1, h2 {
   margin-top: 0;
   color: var(--text-color-section-headings);
   text-align: left;
-  border-bottom: 2px solid var(--primary-color); /* Changed to blue */
+  border-bottom: 2px solid var(--primary-color); /* Consistent with input section */
   padding-bottom: 10px;
   margin-bottom: 20px;
 }
@@ -133,7 +132,6 @@ h1, h2 {
   font-size: 1rem;
 }
 
-/* Consistent blue focus for main form inputs */
 .add-task-form input:focus,
 .add-task-form select:focus {
   border-color: var(--primary-color);
@@ -147,7 +145,7 @@ h1, h2 {
 
 .add-task-form button {
   padding: 12px 15px;
-  background-color: var(--primary-color); /* Back to blue */
+  background-color: var(--primary-color);
   color: white;
   border: none;
   border-radius: 5px;
@@ -159,21 +157,28 @@ h1, h2 {
   align-self: flex-start;
   transition: background-color 0.2s ease, opacity 0.2s ease;
 }
-
 .add-task-form button:hover {
-  background-color: var(--primary-hover-color); /* Back to darker blue */
+  background-color: var(--primary-hover-color);
 }
-
 .add-task-form button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
   opacity: 0.7;
 }
 
-table {
+/* Table scroll wrapper - NEW */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto; /* Add horizontal scrollbar if content overflows */
+  -webkit-overflow-scrolling: touch; /* Smoother scrolling on iOS */
+  margin-bottom: 20px; /* If table had margin, move it here */
+}
+
+table#taskTable { /* Renamed from 'table' for specificity */
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 20px;
+  /* min-width: 750px; /* Optional: Force table to be at least this wide before scrolling */
+  /* Consider removing margin-bottom if .table-scroll-wrapper handles it */
 }
 
 th, td {
@@ -181,6 +186,7 @@ th, td {
   border: 1px solid var(--border-color-light);
   text-align: left;
   vertical-align: middle;
+  white-space: nowrap; /* Prevent text wrapping in cells that might make columns too narrow */
 }
 
 th {
@@ -188,38 +194,49 @@ th {
   font-weight: 500;
   text-transform: uppercase;
   color: #495057;
+  position: sticky; /* Optional: make headers sticky during horizontal scroll */
+  left: 0; /* Required for sticky if first column, or use appropriate left for other sticky cols */
+  z-index: 1; /* To keep it above other scrolling content */
 }
+/* If you make Rank column sticky */
+/*
+th:first-child, td:first-child {
+  position: -webkit-sticky;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--background-color-table-header); // For th
+}
+td:first-child {
+    background-color: var(--background-color-container); // For td to match row bg
+}
+*/
+
 
 tbody tr {
   transition: background-color 0.2s ease-in-out;
 }
-/* Updated hover background for all rows */
 tbody tr:hover, tbody tr:focus-visible {
   background-color: var(--table-hover-background);
   cursor: pointer;
   outline: none;
 }
-
 tbody tr.task-done td {
   color: var(--done-task-color);
   text-decoration: line-through;
 }
-/* Ensure done task hover also uses the general hover color */
 tbody tr.task-done:hover, tbody tr.task-done:focus-visible {
   background-color: var(--table-hover-background);
 }
-
 tbody tr.task-done .status-badge {
   text-decoration: line-through;
 }
-
 tbody tr.task-done .action-btn {
   opacity: 0.7;
 }
 tbody tr.task-done .action-btn:hover {
   opacity: 1;
 }
-
 
 .action-btn {
   padding: 6px 12px;
@@ -230,8 +247,8 @@ tbody tr.task-done .action-btn:hover {
   font-family: var(--font-family-main);
   font-weight: 400;
   transition: background-color 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap; /* Prevent button text from wrapping */
 }
-
 .delete-btn {
   background-color: var(--danger-color);
   color: white;
@@ -245,7 +262,6 @@ tbody tr.task-done .action-btn:hover {
   opacity: 0.7;
 }
 
-/* Status Badge Styles (no change) */
 .status-badge {
   padding: 0.25em 0.6em;
   font-size: 0.9em;
@@ -261,172 +277,50 @@ tbody tr.task-done .action-btn:hover {
 .status-paused { background-color: var(--status-paused-bg); color: var(--status-paused-text); }
 .status-done { background-color: var(--status-done-bg); color: var(--status-done-text); }
 
-
-/* Modal Styles */
 .modal {
-  display: none;
-  position: fixed;
-  z-index: 1000;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  background-color: var(--modal-overlay-color);
-  padding: 20px 0;
-  box-sizing: border-box;
+  display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+  overflow-y: auto; background-color: var(--modal-overlay-color); padding: 20px 0; box-sizing: border-box;
   font-family: var(--font-family-main);
 }
-
 .modal-content {
-  background-color: var(--modal-background-color);
-  margin: 0 auto;
-  padding: 30px;
-  border: none;
-  width: 90%;
-  max-width: 800px;
-  border-radius: 10px;
-  position: relative;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.25);
-  box-sizing: border-box;
+  background-color: var(--modal-background-color); margin: 0 auto; padding: 30px; border: none;
+  width: 90%; max-width: 800px; border-radius: 10px; position: relative;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.25); box-sizing: border-box;
 }
-
-.modal-content div:not(.image-preview-container) {
-  margin-bottom: 18px;
-}
-
-.modal-content label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
-  color: #34495e;
-}
-
+.modal-content div:not(.image-preview-container) { margin-bottom: 18px; }
+.modal-content label { display: block; margin-bottom: 6px; font-weight: 500; color: #34495e; }
 .modal-content input[type="text"],
 .modal-content input[type="number"],
 .modal-content select,
 .modal-content textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border-color-modal-inputs);
-  border-radius: 5px;
-  box-sizing: border-box;
-  font-family: var(--font-family-main);
-  font-size: 1rem;
+  width: 100%; padding: 12px; border: 1px solid var(--border-color-modal-inputs);
+  border-radius: 5px; box-sizing: border-box; font-family: var(--font-family-main); font-size: 1rem;
 }
-
-/* Consistent blue focus for modal inputs */
 .modal-content input:focus,
 .modal-content select:focus,
 .modal-content textarea:focus {
-  border-color: var(--primary-color); /* Back to blue */
-  box-shadow: 0 0 0 0.2rem var(--primary-focus-shadow); /* Back to blue shadow */
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem var(--primary-focus-shadow);
   outline: none;
 }
-
-
-.modal-content textarea#modalTaskDetails {
-  resize: none;
-  overflow-y: hidden;
-  min-height: 100px;
-}
-
-.modal-content textarea#modalTaskImageUrls {
-  resize: vertical;
-  min-height: 80px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-
+.modal-content textarea#modalTaskDetails { resize: none; overflow-y: hidden; min-height: 100px; }
+.modal-content textarea#modalTaskImageUrls { resize: vertical; min-height: 80px; max-height: 200px; overflow-y: auto; }
 .modal-content button#saveTaskDetailsBtn {
-  padding: 12px 20px;
-  background-color: var(--primary-color); /* Back to blue */
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-family: var(--font-family-main);
-  font-size: 1.1rem;
-  text-transform: uppercase;
-  transition: background-color 0.2s ease, opacity 0.2s ease;
+  padding: 12px 20px; background-color: var(--primary-color); color: white; border: none;
+  border-radius: 5px; cursor: pointer; font-family: var(--font-family-main);
+  font-size: 1.1rem; text-transform: uppercase; transition: background-color 0.2s ease, opacity 0.2s ease;
 }
-.modal-content button#saveTaskDetailsBtn:hover {
-  background-color: var(--primary-hover-color); /* Back to darker blue */
-}
-.modal-content button#saveTaskDetailsBtn:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
+.modal-content button#saveTaskDetailsBtn:hover { background-color: var(--primary-hover-color); }
+.modal-content button#saveTaskDetailsBtn:disabled { background-color: #ccc; cursor: not-allowed; opacity: 0.7; }
 .close-button {
-  color: #7f8c8d;
-  position: absolute;
-  top: 15px;
-  right: 20px;
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1;
+  color: #7f8c8d; position: absolute; top: 15px; right: 20px;
+  font-size: 36px; font-weight: 700; line-height: 1;
 }
-
-.close-button:hover,
-.close-button:focus {
-  color: #2c3e50;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.image-preview-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 10px;
-  background-color: #ecf0f1;
-  border: 1px solid #dde4e8;
-  border-radius: 5px;
-  min-height: 60px;
-}
-
-.image-preview-container img {
-  max-width: 180px;
-  max-height: 180px;
-  border: 1px solid var(--border-color-modal-inputs);
-  object-fit: cover;
-  border-radius: 5px;
-  background-color: #fff;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-/* Notification placeholder - basic styling (no change) */
-.notification {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: var(--text-color-main);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    z-index: 2000;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    opacity: 0;
-    transition: opacity 0.3s ease, bottom 0.3s ease;
-    visibility: hidden;
-}
+.close-button:hover, .close-button:focus { color: #2c3e50; text-decoration: none; cursor: pointer; }
+.image-preview-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; padding: 10px; background-color: #ecf0f1; border: 1px solid #dde4e8; border-radius: 5px; min-height: 60px; }
+.image-preview-container img { max-width: 180px; max-height: 180px; border: 1px solid var(--border-color-modal-inputs); object-fit: cover; border-radius: 5px; background-color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.notification { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background-color: var(--text-color-main); color: white; padding: 10px 20px; border-radius: 5px; z-index: 2000; box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s ease, bottom 0.3s ease; visibility: hidden; }
 .notification.show { opacity: 1; bottom: 30px; visibility: visible; }
 .notification.error { background-color: var(--danger-color); }
 .notification.success { background-color: #28a745; }
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
