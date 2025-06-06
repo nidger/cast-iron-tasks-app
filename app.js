@@ -10,25 +10,10 @@ const firebaseConfig = {
     appId: "1:742460863108:web:af3fd7ec7f746dd8a948d1"
   };
   
-  /*
-  --------------------------------------------------------------------------------
-    IMPORTANT: FIREBASE SECURITY RULES (Set these in Firebase Console > Firestore Database > Rules)
-    You should have updated your rules to something like:
-    rules_version = '2';
-    service cloud.firestore {
-      match /databases/{database}/documents {
-        match /tasks/{taskId} {
-          allow read, write: if request.auth != null;
-        }
-      }
-    }
-  --------------------------------------------------------------------------------
-  */
-  
   // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore(); // Firestore instance
-  const auth = firebase.auth();   // Auth instance
+  const db = firebase.firestore();
+  const auth = firebase.auth();
   const tasksCollection = db.collection('tasks');
   
   // --- Constants ---
@@ -45,7 +30,7 @@ const firebaseConfig = {
       CONFIRM: 'confirm'
   };
   
-  // DOM Elements - Declare globally with 'let', will be assigned in initializeAppLogic
+  // DOM Elements - Declare globally, will be assigned in initializeAppLogic
   let taskTableBody, addTaskBtn, taskTitleInput, benefitScoreInput, complexityScoreInput,
       taskStatusInput, taskTagInput, taskWhoInput, modal, closeModalBtn, saveTaskDetailsBtn,
       modalTaskId, modalTaskTitle, modalBenefitScore, modalComplexityScore, modalTaskStatus,
@@ -53,7 +38,8 @@ const firebaseConfig = {
       exportCsvButton;
   
   let elementToFocusOnModalClose = null;
-  let allFetchedTasks = []; // Array to store tasks for CSV export and rendering
+  let allFetchedTasks = [];
+  let appInitialized = false; // Flag to prevent multiple initializations
   
   // --- Helper Functions ---
   const calculatePriorityScore = (benefit, complexity) => {
@@ -77,7 +63,7 @@ const firebaseConfig = {
   }
   
   const showNotification = (message, type = NOTIFICATION_TYPES.INFO, duration = 3000) => {
-      console.log(`Notification (${type}): ${message}`);
+      console.log(`Notification (${type}): ${message}`); // Log all notifications
       const notificationElement = document.createElement('div');
       notificationElement.className = `notification ${type}`;
       notificationElement.textContent = message;
@@ -136,8 +122,6 @@ const firebaseConfig = {
               option.value = statusValue; option.textContent = statusValue;
               selectElement.appendChild(option);
           });
-      } else {
-          // console.error("populateStatusDropdown: selectElement is NULL. This might be okay if called before DOM ready.");
       }
   };
   
@@ -150,9 +134,9 @@ const firebaseConfig = {
       return stringField;
   }
   
-  // --- Core Functions Definitions (must be defined before being called in initializeAppLogic) ---
+  // --- Core Functions Definitions ---
   const renderTasks = (tasksToRender) => {
-      if (!taskTableBody) { console.error("renderTasks: taskTableBody is not yet available."); return; }
+      if (!taskTableBody) { console.error("renderTasks: taskTableBody is not available."); return; }
       taskTableBody.innerHTML = '';
       if (tasksToRender.length === 0) {
           const row = taskTableBody.insertRow(); const cell = row.insertCell();
@@ -197,13 +181,14 @@ const firebaseConfig = {
           await tasksCollection.add(newTask);
           showNotification('Task added successfully!', NOTIFICATION_TYPES.SUCCESS);
           taskTitleInput.value = ''; benefitScoreInput.value = ''; complexityScoreInput.value = '';
-          taskStatusInput.value = TASK_STATUS.TODO; taskTagInput.value = ''; taskWhoInput.value = '';
+          if (taskStatusInput) taskStatusInput.value = TASK_STATUS.TODO;
+          taskTagInput.value = ''; taskWhoInput.value = '';
           taskTitleInput.focus();
       } catch (error) {
           console.error("Error adding task: ", error);
           showNotification("Error adding task. See console for details.", NOTIFICATION_TYPES.ERROR);
       } finally {
-          addTaskBtn.disabled = false; addTaskBtn.textContent = 'Add Task';
+          if (addTaskBtn) { addTaskBtn.disabled = false; addTaskBtn.textContent = 'Add Task'; }
       }
   };
   
@@ -228,13 +213,14 @@ const firebaseConfig = {
       modalTaskId.value = task.id; modalTaskTitle.value = task.title;
       modalBenefitScore.value = task.benefitScore === 0 ? '' : task.benefitScore;
       modalComplexityScore.value = task.complexityScore === 0 ? '' : task.complexityScore;
-      modalTaskStatus.value = task.status; modalTaskTag.value = task.tag || ''; modalTaskWho.value = task.who || '';
+      if (modalTaskStatus) modalTaskStatus.value = task.status;
+      modalTaskTag.value = task.tag || ''; modalTaskWho.value = task.who || '';
       modalTaskDetails.value = task.details || '';
       modalTaskImageUrls.value = (task.imageUrls && Array.isArray(task.imageUrls)) ? task.imageUrls.join('\n') : '';
       renderModalImagePreview(task.imageUrls || []);
       modal.style.display = 'block';
       autoResizeTextarea(modalTaskDetails); autoResizeTextarea(modalTaskImageUrls);
-      modalTaskTitle.focus();
+      if (modalTaskTitle) modalTaskTitle.focus();
   };
   
   const renderModalImagePreview = (urls) => {
@@ -242,7 +228,7 @@ const firebaseConfig = {
       modalImagePreview.innerHTML = '';
       if (urls && Array.isArray(urls) && urls.length > 0) {
           urls.forEach(url => {
-              const trimmedUrl = String(url).trim(); // Ensure url is a string
+              const trimmedUrl = String(url).trim();
               if (trimmedUrl !== '') {
                   const img = document.createElement('img'); img.src = trimmedUrl; img.alt = 'Task Image Preview';
                   img.onerror = () => {
@@ -289,7 +275,7 @@ const firebaseConfig = {
           console.error("Error updating task: ", error);
           showNotification("Error updating task. See console for details.", NOTIFICATION_TYPES.ERROR);
       } finally {
-          saveTaskDetailsBtn.disabled = false; saveTaskDetailsBtn.textContent = 'Save Changes';
+          if (saveTaskDetailsBtn) { saveTaskDetailsBtn.disabled = false; saveTaskDetailsBtn.textContent = 'Save Changes'; }
       }
   };
   
@@ -320,31 +306,11 @@ const firebaseConfig = {
       }
   };
   
+  // --- Application Initialization Logic ---
+  function initializeAppLogic(user) {
+      console.log("initializeAppLogic called. User UID (if available):", user ? user.uid : "No user object. Auth might have failed or is pending.");
   
-  // --- Anonymous Authentication and App Initialization ---
-  auth.signInAnonymously()
-    .then(() => {
-      console.log('User signed in anonymously');
-      initializeAppLogic(); // Initialize app after successful anonymous sign-in
-    })
-    .catch((error) => {
-      console.error('Anonymous sign-in failed:', error);
-      if (document.body) {
-          document.body.innerHTML = `
-              <div style="padding: 20px; text-align: center; font-family: sans-serif;">
-                  <h1>Application Error</h1>
-                  <p>Could not authenticate with the service. Please try refreshing the page.</p>
-                  <p>If the problem persists, please contact support.</p>
-                  <p><em>Error details (for debugging): ${error.message}</em></p>
-              </div>
-          `;
-      }
-    });
-  
-  function initializeAppLogic() {
-      console.log("Initializing application logic after anonymous sign-in.");
-  
-      // Assign DOM elements (now that DOM is ready and auth is complete)
+      // Assign DOM elements now that we expect the DOM to be ready
       taskTableBody = document.querySelector('#taskTable tbody');
       addTaskBtn = document.getElementById('addTaskBtn');
       taskTitleInput = document.getElementById('taskTitle');
@@ -368,17 +334,19 @@ const firebaseConfig = {
       modalTaskWho = document.getElementById('modalTaskWho');
       exportCsvButton = document.getElementById('exportCsvBtn');
   
+      if (!taskTableBody || !addTaskBtn /* ... add more checks for essential elements */) {
+          console.error("Critical DOM elements missing in initializeAppLogic. Aborting further UI setup.");
+          showNotification("Error initializing the application interface. Please refresh.", NOTIFICATION_TYPES.ERROR, 10000);
+          return;
+      }
+  
       // Populate dropdowns
       if (taskStatusInput) {
           populateStatusDropdown(taskStatusInput);
-          taskStatusInput.value = TASK_STATUS.TODO; // Set default after populating
-      } else {
-          console.error("#taskStatus (Add Form) not found in initializeAppLogic");
+          taskStatusInput.value = TASK_STATUS.TODO;
       }
       if (modalTaskStatus) {
           populateStatusDropdown(modalTaskStatus);
-      } else {
-          console.error("#modalTaskStatus (Modal Form) not found in initializeAppLogic");
       }
   
       // Attach event listeners
@@ -386,12 +354,10 @@ const firebaseConfig = {
       if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
       if (saveTaskDetailsBtn) saveTaskDetailsBtn.addEventListener('click', saveTaskDetails);
       if (exportCsvButton) exportCsvButton.addEventListener('click', exportTasksToCsv);
-  
       if (benefitScoreInput) benefitScoreInput.addEventListener('input', handleScoreInput);
       if (complexityScoreInput) complexityScoreInput.addEventListener('input', handleScoreInput);
       if (modalBenefitScore) modalBenefitScore.addEventListener('input', handleScoreInput);
       if (modalComplexityScore) modalComplexityScore.addEventListener('input', handleScoreInput);
-  
       if (modalTaskDetails) modalTaskDetails.addEventListener('input', function() { autoResizeTextarea(this); });
       if (modalTaskImageUrls) {
           modalTaskImageUrls.addEventListener('input', function() {
@@ -400,41 +366,41 @@ const firebaseConfig = {
               renderModalImagePreview(urls);
           });
       }
-  
       window.onclick = (event) => { if (modal && event.target == modal) closeModal(); };
-      window.addEventListener('keydown', (event) => {
-          if (modal && event.key === 'Escape' && modal.style.display === 'block') closeModal();
-      });
+      window.addEventListener('keydown', (event) => { if (modal && event.key === 'Escape' && modal.style.display === 'block') closeModal(); });
   
       // Firestore listener for real-time updates
-      tasksCollection
-          .orderBy('createdAt', 'desc')
+      console.log("Setting up Firestore onSnapshot listener within initializeAppLogic...");
+      tasksCollection.orderBy('createdAt', 'desc')
           .onSnapshot(snapshot => {
+              console.log("onSnapshot: Data received. User authenticated:", auth.currentUser ? auth.currentUser.uid : "No current user");
               let tasksFromDb = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
               tasksFromDb.sort((a, b) => {
-                const isDoneA = a.status === TASK_STATUS.DONE; const isDoneB = b.status === TASK_STATUS.DONE;
-                if (isDoneA !== isDoneB) return isDoneA ? 1 : -1;
-                if (isDoneA && isDoneB) return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
-                const categoryA = getScoringCategory(a); const categoryB = getScoringCategory(b);
-                if (categoryA !== categoryB) return categoryB - categoryA;
-                if (categoryA === 2) {
-                    const priorityA = a.priorityScore; const priorityB = b.priorityScore;
-                    if (priorityA !== priorityB) return priorityB - priorityA;
-                }
-                return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
+                  const isDoneA = a.status === TASK_STATUS.DONE; const isDoneB = b.status === TASK_STATUS.DONE;
+                  if (isDoneA !== isDoneB) return isDoneA ? 1 : -1;
+                  if (isDoneA && isDoneB) return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
+                  const categoryA = getScoringCategory(a); const categoryB = getScoringCategory(b);
+                  if (categoryA !== categoryB) return categoryB - categoryA;
+                  if (categoryA === 2) {
+                      const priorityA = a.priorityScore; const priorityB = b.priorityScore;
+                      if (priorityA !== priorityB) return priorityB - priorityA;
+                  }
+                  return (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0);
               });
               allFetchedTasks = tasksFromDb;
               renderTasks(allFetchedTasks);
-              console.log("Tasks successfully fetched (anonymously authenticated), sorted, and stored for export.");
+              console.log("Tasks successfully fetched, sorted, and rendered.");
           }, error => {
-              console.error("Error fetching tasks (anonymously authenticated): ", error);
-              if (error.code === 'permission-denied') {
-                  showNotification("Permission denied fetching tasks. Firestore rules may need adjustment or auth failed.", NOTIFICATION_TYPES.ERROR, 7000);
+              console.error("onSnapshot Error (inside initializeAppLogic):", error); // This is the critical error point
+              // Error code 403 is common for permission denied
+              if (error.code === 'permission-denied' || (error.code === 7 && error.message && error.message.toLowerCase().includes("permission denied"))) {
+                  showNotification("PERMISSION DENIED fetching tasks. Ensure Firestore rules allow access and Anonymous Auth is enabled & working.", NOTIFICATION_TYPES.ERROR, 10000);
+                  console.error("Detailed Permission Denied Error:", error.message, error.code, error.name);
+                  console.error("Current auth state when error occurred:", auth.currentUser ? `User UID: ${auth.currentUser.uid}, Anonymous: ${auth.currentUser.isAnonymous}` : "No user authenticated");
               } else {
                   let userMessage = "Error fetching tasks. See console.";
                   if (error.code === 'failed-precondition' && error.message.includes("index")) {
                       userMessage = "Firestore needs an index. Check console for link, then refresh.";
-                      console.log("Firestore index link:", error.message.substring(error.message.indexOf('https://')));
                   } else if (error.code === 'unavailable') {
                       userMessage = "Could not connect to Firestore. Check connection/Firebase.";
                   }
@@ -442,3 +408,36 @@ const firebaseConfig = {
               }
           });
   }
+  
+  // --- Firebase Auth State Listener and Anonymous Sign-In ---
+  // This is the entry point for the application logic after the script loads.
+  auth.onAuthStateChanged(user => {
+      console.log("Auth state changed. User:", user ? `UID: ${user.uid}, Anonymous: ${user.isAnonymous}` : "null (signed out)");
+      if (user) {
+          // User is signed in (could be anonymous).
+          if (!appInitialized) { // Initialize the app's UI and listeners only once
+              console.log("User is authenticated, proceeding to initializeAppLogic.");
+              initializeAppLogic(user);
+              appInitialized = true;
+          } else {
+              console.log("User is authenticated, but app already initialized. (e.g. token refresh)");
+          }
+      } else {
+          // User is signed out. Attempt to sign in anonymously.
+          console.log("No authenticated user found. Attempting anonymous sign-in...");
+          auth.signInAnonymously()
+              .catch(error => {
+                  console.error('CRITICAL: Anonymous sign-in failed within onAuthStateChanged:', error);
+                  if (document.body) { // Make sure body is available
+                      document.body.innerHTML = `
+                          <div style="padding: 20px; text-align: center; font-family: sans-serif;">
+                              <h1>Application Critical Error</h1>
+                              <p>Could not authenticate with the service. This app requires authentication to function.</p>
+                              <p>Please ensure Anonymous Sign-In is enabled in your Firebase project settings and try refreshing.</p>
+                              <p><em>Error details: ${error.message}</em></p>
+                          </div>
+                      `;
+                  }
+              });
+      }
+  });
